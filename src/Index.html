@@ -70,10 +70,144 @@
     </section>
   </main>
 
-  <!-- 🚀 Updated JS with Skeletons -->
+  <!-- 🚀 Full JS with Skeleton Screens -->
   <script>
-    /* === FULL upgraded JS with skeletons === */
-    /* Paste the skeleton-enabled JS I gave earlier here */
+    const $=(s)=>document.querySelector(s);
+    const API_BASE="https://script.google.com/macros/s/AKfycbzyRbe0-ZNEhwQ0YMBFfdyIb-CgmvqpWlIqzHvsAP_W85CC7OZCble_ztKSTdl9Z6QQsQ/exec";
+    const SHEET_URL="https://docs.google.com/spreadsheets/d/1uZia-6S9wB8SItfl1M2GvfGgFO4PXxE8li8Sgg6T5Po/edit";
+    const GID="0";
+
+    let RAW=[],VIEW=[],PAGE=1,PAGE_SIZE=25,chart;
+    let FILTERS={depts:[],statuses:[],meds:[],indenters:[]};
+
+    const fmtInt=(n)=>Number(n||0).toLocaleString();
+    const fmtMoney=(n)=>(n??0).toLocaleString(undefined,{style:"currency",currency:"MYR",maximumFractionDigits:2});
+
+    // 🦴 Skeletons
+    function showSkeletons(){
+      ["kpiRequested","kpiApproved","kpiIssued","kpiUniqueItems","kpiValue"].forEach(id=>{
+        $(`#${id}`).innerHTML=`<div class="animate-pulse bg-slate-700 h-6 w-16 rounded"></div>`;
+      });
+      const skeletonRows=Array.from({length:8}).map(()=>`
+        <tr class="animate-pulse">
+          ${Array.from({length:11}).map(()=>`<td class="bg-slate-700 h-4 w-20 rounded"></td>`).join("")}
+        </tr>`).join("");
+      $("#tableBody").innerHTML=skeletonRows;
+      $("#rowCount").textContent="Loading…";
+      $("#pageInfo").textContent="";
+    }
+
+    function buildApiUrl(){
+      const params=new URLSearchParams();
+      params.set("format","json");params.set("sheetUrl",SHEET_URL);params.set("gid",GID);
+      const from=$("#fromDate").value,to=$("#toDate").value;
+      if(from)params.set("from",from);if(to)params.set("to",to);
+      FILTERS.depts.forEach(v=>params.append("dept",v));
+      FILTERS.statuses.forEach(v=>params.append("status",v));
+      FILTERS.meds.forEach(v=>params.append("drug",v));
+      FILTERS.indenters.forEach(v=>params.append("indenter",v));
+      const q=$("#searchInput").value.trim();if(q)params.set("q",q);
+      return `${API_BASE}?${params.toString()}`;
+    }
+
+    function loadData(){
+      showSkeletons();
+      fetch(buildApiUrl()).then(r=>r.json()).then(data=>{
+        RAW=data.map(r=>({...r,
+          IndentDate_:r["Indent Date"]?new Date(r["Indent Date"]):null,
+          RequestQty_:+r["Request Qty"]||0,
+          ApprovedQty_:+r["Approved Qty"]||0,
+          IssuedQty_:+r["Issued Qty"]||0,
+          TotalIssueRM_:+r["Total Issue (RM)"]||0,
+          Department_:(r["Department"]||"").trim(),
+          Status_:(r["Status"]||"").trim(),
+          ItemName_:(r["Item Name"]||"").trim(),
+          Indenter_:(r["Indenter"]||"").trim()
+        }));
+        VIEW=RAW;
+        refreshFilters();renderTable();updateKPIs();drawChart();
+      }).catch(err=>alert("Fetch error: "+err.message));
+    }
+
+    function createMultiSelect(el,options,onChange){
+      el.innerHTML=`<input type="text" placeholder="Search..." class="search" /><div class="chips"></div><div class="options"></div>`;
+      const input=el.querySelector(".search"),chips=el.querySelector(".chips"),dropdown=el.querySelector(".options");
+      let selected=[];
+      function renderOptions(q=""){dropdown.innerHTML="";options.filter(o=>o&&o.toLowerCase().includes(q.toLowerCase())&&!selected.includes(o)).forEach(opt=>{
+        const d=document.createElement("div");d.className="option";d.textContent=opt;
+        d.onclick=()=>{selected.push(opt);renderChips();onChange(selected);dropdown.style.display="none";input.value="";};
+        dropdown.appendChild(d);});}
+      function renderChips(){chips.innerHTML="";selected.forEach(opt=>{const c=document.createElement("span");c.className="chip";c.innerHTML=`${opt}<button>&times;</button>`;c.querySelector("button").onclick=()=>{selected=selected.filter(s=>s!==opt);renderChips();onChange(selected);};chips.appendChild(c);});}
+      input.addEventListener("focus",()=>{renderOptions();dropdown.style.display="block";});
+      input.addEventListener("input",()=>renderOptions(input.value));
+      document.addEventListener("click",e=>{if(!el.contains(e.target))dropdown.style.display="none";});
+      renderOptions();
+    }
+
+    function refreshFilters(){
+      const uniq=a=>[...new Set(a.filter(Boolean))].sort();
+      createMultiSelect($("#deptMultiSelect"),uniq(RAW.map(r=>r.Department_)),v=>{FILTERS.depts=v;loadData();});
+      createMultiSelect($("#statusMultiSelect"),uniq(RAW.map(r=>r.Status_)),v=>{FILTERS.statuses=v;loadData();});
+      createMultiSelect($("#medMultiSelect"),uniq(RAW.map(r=>r.ItemName_)),v=>{FILTERS.meds=v;loadData();});
+      createMultiSelect($("#indenterMultiSelect"),uniq(RAW.map(r=>r.Indenter_)),v=>{FILTERS.indenters=v;loadData();});
+    }
+
+    function renderTable(){
+      const head=["Indent No","Indent Date","Department","Indenter","Item Code","Item Name","Request Qty","Approved Qty","Issued Qty","Total Issue (RM)","Status"];
+      $("#tableHead").innerHTML=head.map(h=>`<th>${h}</th>`).join("");
+      $("#tableBody").innerHTML=VIEW.slice((PAGE-1)*PAGE_SIZE,PAGE*PAGE_SIZE).map(r=>`<tr>
+        <td>${r["Indent No"]||""}</td><td>${r["Indent Date"]||""}</td><td>${r.Department_}</td><td>${r.Indenter_}</td>
+        <td>${r["Item Code"]||""}</td><td>${r.ItemName_}</td>
+        <td class="text-right">${fmtInt(r.RequestQty_)}</td>
+        <td class="text-right">${fmtInt(r.ApprovedQty_)}</td>
+        <td class="text-right">${fmtInt(r.IssuedQty_)}</td>
+        <td class="text-right">${fmtMoney(r.TotalIssueRM_)}</td>
+        <td>${r.Status_}</td>
+      </tr>`).join("");
+      $("#rowCount").textContent=`${VIEW.length} rows`;
+      const totalPages=Math.max(1,Math.ceil(VIEW.length/PAGE_SIZE));
+      $("#pageInfo").textContent=`Page ${PAGE} of ${totalPages}`;
+    }
+
+    function updateKPIs(){
+      const sum=k=>VIEW.reduce((a,r)=>a+(r[k]||0),0);
+      $("#kpiRequested").textContent=fmtInt(sum("RequestQty_"));
+      $("#kpiApproved").textContent=fmtInt(sum("ApprovedQty_"));
+      $("#kpiIssued").textContent=fmtInt(sum("IssuedQty_"));
+      $("#kpiUniqueItems").textContent=new Set(VIEW.map(r=>r["Item Code"]||r.ItemName_)).size;
+      $("#kpiValue").textContent=fmtMoney(sum("TotalIssueRM_"));
+    }
+
+    function drawChart(){
+      if(chart)chart.destroy();
+      const byMonth=new Map();
+      VIEW.forEach(r=>{
+        const m=r.IndentDate_?r.IndentDate_.toISOString().slice(0,7):"Unknown";
+        const agg=byMonth.get(m)||{req:0,app:0,iss:0};
+        agg.req+=r.RequestQty_||0;agg.app+=r.ApprovedQty_||0;agg.iss+=r.IssuedQty_||0;
+        byMonth.set(m,agg);
+      });
+      const labels=[...byMonth.keys()].sort();
+      chart=new Chart($("#kpiChart"),{type:"bar",data:{labels,datasets:[
+        {label:"Requested",data:labels.map(l=>byMonth.get(l).req),stack:"x"},
+        {label:"Approved",data:labels.map(l=>byMonth.get(l).app),stack:"x"},
+        {label:"Issued",data:labels.map(l=>byMonth.get(l).iss),stack:"x"}]},
+        options:{responsive:true,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}},plugins:{legend:{labels:{color:"#cbd5e1"}}}}});
+    }
+
+    $("#exportCsv").onclick=()=>{if(!VIEW.length)return;
+      const headers=Object.keys(VIEW[0]);const rows=[headers].concat(VIEW.map(r=>headers.map(h=>r[h]||"")));
+      const csv=Papa.unparse(rows);const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");a.href=url;a.download="indent_vs_supply_filtered.csv";a.click();URL.revokeObjectURL(url);};
+
+    $("#clearAll").onclick=()=>{$("#searchInput").value="";$("#fromDate").value="";$("#toDate").value="";
+      FILTERS={depts:[],statuses:[],meds:[],indenters:[]};loadData();};
+
+    $("#prevPage").onclick=()=>{if(PAGE>1){PAGE--;renderTable();}};
+    $("#nextPage").onclick=()=>{const totalPages=Math.max(1,Math.ceil(VIEW.length/PAGE_SIZE));if(PAGE<totalPages){PAGE++;renderTable();}};
+    $("#pageSize").onchange=()=>{PAGE_SIZE=+$("#pageSize").value;PAGE=1;renderTable();};
+
+    window.onload=loadData;
   </script>
 </body>
 </html>
