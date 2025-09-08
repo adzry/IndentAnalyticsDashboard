@@ -1,7 +1,6 @@
 /**
  * Elite Google Apps Script Backend
- * Serves Index.html and proxies Google Sheet CSV fetch
- * Provides JSON output for advanced filtering
+ * Serves Index.html, proxies Google Sheet CSV, and applies server-side filters
  */
 
 /**
@@ -18,7 +17,7 @@ function doGet(e) {
 }
 
 /**
- * Handle JSON data requests from frontend.
+ * Handle JSON requests with filters applied server-side.
  */
 function handleJsonRequest(e) {
   try {
@@ -30,12 +29,51 @@ function handleJsonRequest(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // Parse CSV
     const rows = Utilities.parseCsv(csv);
     const headers = rows[0];
-    const data = rows.slice(1).map(r => {
+    let data = rows.slice(1).map(r => {
       const rowObj = {};
       headers.forEach((h, i) => rowObj[h] = r[i]);
       return rowObj;
+    });
+
+    // === Apply filters from query params ===
+    const from = e.parameter.from ? new Date(e.parameter.from) : null;
+    const to = e.parameter.to ? new Date(e.parameter.to) : null;
+    const statuses = e.parameter.status ? [].concat(e.parameter.status) : [];
+    const depts = e.parameter.dept ? [].concat(e.parameter.dept) : [];
+    const meds = e.parameter.drug ? [].concat(e.parameter.drug) : [];
+    const indenters = e.parameter.indenter ? [].concat(e.parameter.indenter) : [];
+    const q = e.parameter.q ? e.parameter.q.toLowerCase() : "";
+
+    data = data.filter(r => {
+      try {
+        // Normalize
+        const d = r["Indent Date"] ? new Date(r["Indent Date"]) : null;
+        const status = (r["Status"] || "").trim();
+        const dept = (r["Department"] || "").trim();
+        const med = (r["Item Name"] || "").trim();
+        const ind = (r["Indenter"] || "").trim();
+        const textBlob = `${med} ${dept} ${status} ${ind}`.toLowerCase();
+
+        // Date filters
+        if (from && (!d || d < from)) return false;
+        if (to && (!d || d > to)) return false;
+
+        // Multi-select filters
+        if (statuses.length && !statuses.includes(status)) return false;
+        if (depts.length && !depts.includes(dept)) return false;
+        if (meds.length && !meds.includes(med)) return false;
+        if (indenters.length && !indenters.includes(ind)) return false;
+
+        // Search query
+        if (q && !textBlob.includes(q)) return false;
+
+        return true;
+      } catch (err) {
+        return false;
+      }
     });
 
     return ContentService.createTextOutput(JSON.stringify(data))
@@ -48,10 +86,7 @@ function handleJsonRequest(e) {
 }
 
 /**
- * Fetches CSV data from a Google Sheet.
- * @param {string} sheetUrl Full Google Sheet URL.
- * @param {string} gid Sheet GID (tab id).
- * @return {string|Object} CSV or error object.
+ * Fetch CSV from Google Sheet.
  */
 function getData(sheetUrl, gid) {
   try {
