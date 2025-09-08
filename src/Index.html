@@ -1,11 +1,374 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <title>Indent Dashboard</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Indent vs Supply — Elite Dashboard</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <!-- SEO JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Indent vs Supply Dashboard",
+    "description": "Real-time analytics dashboard for indent vs supply data with advanced filters, KPIs, and charts.",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "All",
+    "creator": { "@type": "Person", "name": "adzry" }
+  }
+  </script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #0F172A; color: #E2E8F0; }
+    mark { background: #fde04780; color: inherit; padding: 0 .125rem; border-radius: .25rem; }
+    .card { background:#0b1220; border:1px solid #1f2a44; }
+    .glass { background: rgba(15,23,42,.6); backdrop-filter: blur(8px); }
+    .table-sticky thead th { position: sticky; top: 0; background:#0b1220; z-index: 1; }
+    .multi-select { position: relative; }
+    .multi-select input { width: 100%; background: #1f2a44; color: white; padding: .6rem .8rem; border-radius: .6rem; outline: none; }
+    .multi-select .options { position:absolute; top:100%; left:0; right:0; background:#0b1220; border:1px solid #1f2a44; border-radius:.6rem; max-height: 220px; overflow-y:auto; z-index: 50; display:none; }
+    .multi-select .option { padding:.5rem .7rem; cursor:pointer; }
+    .multi-select .option:hover { background:#1f2a44; }
+    .multi-select .chips { display:flex; flex-wrap:wrap; gap:.25rem; margin-top:.25rem; }
+    .multi-select .chip { background:#1f2a44; color:#cbd5e1; padding:.15rem .5rem; border-radius:9999px; display:flex; align-items:center; gap:.35rem; font-size:.75rem; }
+    .multi-select .chip button{ background:transparent;border:none;color:#93c5fd;cursor:pointer }
+  </style>
 </head>
 <body>
-  <h1>Indent Dashboard Ready</h1>
-  <p>Replace this with your full UI.</p>
+
+  <!-- NAVBAR -->
+  <nav class="glass sticky top-0 z-50 flex items-center justify-between px-6 py-3 shadow-lg">
+    <div class="text-lg font-semibold text-indigo-400">Indent vs Supply</div>
+    <div class="flex gap-4 text-sm text-slate-300">
+      <a class="hover:text-white">Dashboard</a>
+      <a class="hover:text-white">Reports</a>
+      <a class="hover:text-white">About</a>
+    </div>
+  </nav>
+
+  <main class="container mx-auto px-4 py-7 space-y-6">
+
+    <!-- FILTERS -->
+    <section class="card rounded-3xl p-6 shadow-lg">
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <h2 class="text-lg font-semibold">Filters</h2>
+        <div class="flex items-center gap-2">
+          <button id="clearAll" class="text-xs px-3 py-1 rounded-full bg-slate-700 hover:bg-slate-600">Clear</button>
+          <button id="exportCsv" class="text-xs px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-500">Export CSV</button>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <!-- Search -->
+        <div>
+          <label class="block text-sm mb-1">Search / Query</label>
+          <input id="searchInput" type="search" class="w-full bg-slate-700 text-white rounded-xl px-4 py-2"
+                 placeholder='Examples: status:approved req:>=100 date:2025-08-01..2025-09-01 "amoxicillin"' />
+        </div>
+
+        <!-- Date -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm mb-1">From date</label>
+            <input id="fromDate" type="date" class="w-full bg-slate-700 rounded-xl px-4 py-2" />
+          </div>
+          <div>
+            <label class="block text-sm mb-1">To date</label>
+            <input id="toDate" type="date" class="w-full bg-slate-700 rounded-xl px-4 py-2" />
+          </div>
+        </div>
+
+        <!-- Multi-selects -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm mb-1">Department</label>
+            <div id="deptMultiSelect" class="multi-select"></div>
+          </div>
+          <div>
+            <label class="block text-sm mb-1">Status</label>
+            <div id="statusMultiSelect" class="multi-select"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm mb-1">Medication</label>
+            <div id="medMultiSelect" class="multi-select"></div>
+          </div>
+          <div>
+            <label class="block text-sm mb-1">Indenter</label>
+            <div id="indenterMultiSelect" class="multi-select"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- KPIs -->
+    <section class="card rounded-3xl p-6 shadow-lg">
+      <div class="flex justify-between mb-4">
+        <h2 class="text-lg font-semibold">KPIs</h2>
+        <span id="rowCount" class="bg-indigo-900/50 px-3 py-1 rounded-full text-xs">0 rows</span>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div class="glass rounded-xl p-4"><div class="text-slate-400 text-xs">Total Req</div><div id="kpiRequested" class="text-2xl font-bold">–</div></div>
+        <div class="glass rounded-xl p-4"><div class="text-slate-400 text-xs">Total App</div><div id="kpiApproved" class="text-2xl font-bold">–</div></div>
+        <div class="glass rounded-xl p-4"><div class="text-slate-400 text-xs">Total Iss</div><div id="kpiIssued" class="text-2xl font-bold">–</div></div>
+        <div class="glass rounded-xl p-4"><div class="text-slate-400 text-xs">Unique</div><div id="kpiUniqueItems" class="text-2xl font-bold">–</div></div>
+        <div class="glass rounded-xl p-4"><div class="text-slate-400 text-xs">Total Value</div><div id="kpiValue" class="text-2xl font-bold">–</div></div>
+      </div>
+      <canvas id="kpiChart" height="110"></canvas>
+    </section>
+
+    <!-- TABLE -->
+    <section class="card rounded-3xl p-6 shadow-lg">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-sm text-slate-400">Results</div>
+        <div class="flex items-center gap-3">
+          <label class="text-xs text-slate-400">Rows</label>
+          <select id="pageSize" class="bg-slate-700 rounded px-2 py-1 text-xs">
+            <option>10</option><option selected>25</option><option>50</option><option>100</option>
+          </select>
+        </div>
+      </div>
+      <div class="overflow-auto max-h-[60vh] table-sticky">
+        <table class="w-full text-sm" id="dataTable">
+          <thead><tr id="tableHead" class="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left"></tr></thead>
+          <tbody id="tableBody" class="[&>tr:nth-child(even)]:bg-slate-900/40"></tbody>
+        </table>
+      </div>
+      <div class="flex items-center justify-between mt-4">
+        <button id="prevPage" class="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600">Prev</button>
+        <div id="pageInfo" class="text-xs text-slate-400">Page 1</div>
+        <button id="nextPage" class="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600">Next</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- FULL JS LOGIC -->
+  <script>
+    const $ = (s)=>document.querySelector(s);
+    const SHEET_URL = "https://docs.google.com/spreadsheets/d/1uZia-6S9wB8SItfl1M2GvfGgFO4PXxE8li8Sgg6T5Po/edit";
+    const GID = "0";
+
+    let RAW=[], VIEW=[], PAGE=1, PAGE_SIZE=25, FILTERS={depts:[],statuses:[],meds:[],indenters:[]};
+    let chart;
+
+    const fmtInt=(n)=>Number(n||0).toLocaleString();
+    const fmtMoney=(n)=> (n??0).toLocaleString(undefined,{style:'currency',currency:'MYR',maximumFractionDigits:2});
+
+    /* -------- Multi-select builder -------- */
+    function createMultiSelect(el, options, onChange) {
+      el.innerHTML = `<input type="text" placeholder="Search..." class="search" /><div class="chips"></div><div class="options"></div>`;
+      const input=el.querySelector(".search"),chips=el.querySelector(".chips"),dropdown=el.querySelector(".options");
+      let selected=[];
+      function renderOptions(q=""){
+        dropdown.innerHTML="";
+        options.filter(o=>o&&o.toLowerCase().includes(q.toLowerCase())&&!selected.includes(o))
+          .slice(0,300).forEach(opt=>{
+            const d=document.createElement("div");d.className="option";d.textContent=opt;
+            d.onclick=()=>{selected.push(opt);renderChips();onChange(selected);dropdown.style.display="none";input.value="";};
+            dropdown.appendChild(d);
+          });
+      }
+      function renderChips(){
+        chips.innerHTML="";
+        selected.forEach(opt=>{
+          const c=document.createElement("span");
+          c.className="chip";
+          c.innerHTML=`${opt}<button>&times;</button>`;
+          c.querySelector("button").onclick=()=>{selected=selected.filter(s=>s!==opt);renderChips();onChange(selected);};
+          chips.appendChild(c);
+        });
+      }
+      input.addEventListener("focus",()=>{renderOptions();dropdown.style.display="block";});
+      input.addEventListener("input",()=>renderOptions(input.value));
+      document.addEventListener("click",e=>{if(!el.contains(e.target))dropdown.style.display="none";});
+      renderOptions();
+    }
+
+    /* -------- Data load via Apps Script backend -------- */
+    function loadData(){
+      google.script.run.withSuccessHandler(csv=>{
+        if(typeof csv==="object"&&csv.error){alert(csv.error);return;}
+        const rows=csv.split("\n").map(r=>r.split(","));
+        const headers=rows[0];
+        RAW=rows.slice(1).filter(r=>r.length===headers.length)
+            .map(r=>Object.fromEntries(r.map((v,i)=>[headers[i],v])));
+
+        RAW=RAW.map(r=>({
+          ...r,
+          IndentDate_: new Date(r["Indent Date"]),
+          RequestQty_: +String(r["Request Qty"]||'').replace(/,/g,'') || 0,
+          ApprovedQty_: +String(r["Approved Qty"]||'').replace(/,/g,'') || 0,
+          IssuedQty_: +String(r["Issued Qty"]||'').replace(/,/g,'') || 0,
+          TotalIssueRM_: +String(r["Total Issue (RM)"]||'').replace(/,/g,'') || 0,
+          Department_: (r["Department"]||'').trim(),
+          Status_: (r["Status"]||'').trim(),
+          ItemName_: (r["Item Name"]||'').trim(),
+          Indenter_: (r["Indenter"]||'').trim()
+        }));
+
+        refreshFilters();
+        applyFilters();
+      }).getData(SHEET_URL,GID);
+    }
+
+    /* -------- Filter pipeline -------- */
+    function refreshFilters(){
+      const uniq=arr=>[...new Set(arr.filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+      createMultiSelect($("#deptMultiSelect"),uniq(RAW.map(r=>r.Department_)),v=>{FILTERS.depts=v;applyFilters();});
+      createMultiSelect($("#statusMultiSelect"),uniq(RAW.map(r=>r.Status_)),v=>{FILTERS.statuses=v;applyFilters();});
+      createMultiSelect($("#medMultiSelect"),uniq(RAW.map(r=>r.ItemName_)),v=>{FILTERS.meds=v;applyFilters();});
+      createMultiSelect($("#indenterMultiSelect"),uniq(RAW.map(r=>r.Indenter_)),v=>{FILTERS.indenters=v;applyFilters();});
+    }
+
+    function applyFilters(){
+      let v=[...RAW];
+
+      // text query
+      const q=$("#searchInput").value.trim().toLowerCase();
+      if(q){
+        v=v.filter(r=>`${r.ItemName_} ${r.Department_} ${r.Status_} ${r.Indenter_}`.toLowerCase().includes(q));
+      }
+
+      // date range
+      const from=$("#fromDate").value ? new Date($("#fromDate").value) : null;
+      const to=$("#toDate").value ? new Date($("#toDate").value) : null;
+      if(from) v=v.filter(r=> r.IndentDate_ && r.IndentDate_>=from);
+      if(to)   v=v.filter(r=> r.IndentDate_ && r.IndentDate_<=to);
+
+      // multi-selects
+      if(FILTERS.depts.length) v=v.filter(r=>FILTERS.depts.includes(r.Department_));
+      if(FILTERS.statuses.length) v=v.filter(r=>FILTERS.statuses.includes(r.Status_));
+      if(FILTERS.meds.length) v=v.filter(r=>FILTERS.meds.includes(r.ItemName_));
+      if(FILTERS.indenters.length) v=v.filter(r=>FILTERS.indenters.includes(r.Indenter_));
+
+      VIEW=v;
+      PAGE=1;
+      renderTable();
+      updateKPIs();
+      drawChart();
+    }
+
+    /* -------- Table / pagination -------- */
+    function renderTable(){
+      const head=["Indent No","Indent Date","Department","Indenter","Item Code","Item Name","Request Qty","Approved Qty","Issued Qty","Total Issue (RM)","Status"];
+      $("#tableHead").innerHTML=head.map(h=>`<th>${h}</th>`).join("");
+
+      const start=(PAGE-1)*PAGE_SIZE, end=PAGE*PAGE_SIZE;
+      const q=$("#searchInput").value.trim();
+      const hilite=(t)=> q ? String(t||"").replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&')})`,'gi'),'<mark>$1</mark>') : (t||"");
+
+      $("#tableBody").innerHTML=VIEW.slice(start,end).map(r=>`
+        <tr class="[&>td]:px-3 [&>td]:py-2">
+          <td>${r["Indent No"]||""}</td>
+          <td>${r["Indent Date"]||""}</td>
+          <td>${hilite(r.Department_)}</td>
+          <td>${hilite(r.Indenter_)}</td>
+          <td>${r["Item Code"]||""}</td>
+          <td>${hilite(r.ItemName_)}</td>
+          <td class="text-right">${fmtInt(r.RequestQty_)}</td>
+          <td class="text-right">${fmtInt(r.ApprovedQty_)}</td>
+          <td class="text-right">${fmtInt(r.IssuedQty_)}</td>
+          <td class="text-right">${fmtMoney(r.TotalIssueRM_)}</td>
+          <td>${hilite(r.Status_)}</td>
+        </tr>`).join("");
+
+      $("#rowCount").textContent=`${VIEW.length.toLocaleString()} rows`;
+      const totalPages=Math.max(1,Math.ceil(VIEW.length/PAGE_SIZE));
+      $("#pageInfo").textContent=`Page ${PAGE} of ${totalPages}`;
+    }
+
+    /* -------- KPIs + Chart -------- */
+    function updateKPIs(){
+      const sum=k=>VIEW.reduce((a,r)=>a+(r[k]||0),0);
+      $("#kpiRequested").textContent=fmtInt(sum("RequestQty_"));
+      $("#kpiApproved").textContent=fmtInt(sum("ApprovedQty_"));
+      $("#kpiIssued").textContent=fmtInt(sum("IssuedQty_"));
+      $("#kpiUniqueItems").textContent=new Set(VIEW.map(r=>r["Item Code"]||r.ItemName_)).size.toLocaleString();
+      $("#kpiValue").textContent=fmtMoney(sum("TotalIssueRM_"));
+    }
+
+    function drawChart(){
+      const byMonth=new Map();
+      VIEW.forEach(r=>{
+        const m=r.IndentDate_?r.IndentDate_.toISOString().slice(0,7):"Unknown";
+        const agg=byMonth.get(m)||{req:0,app:0,iss:0};
+        agg.req+=r.RequestQty_||0; agg.app+=r.ApprovedQty_||0; agg.iss+=r.IssuedQty_||0;
+        byMonth.set(m,agg);
+      });
+
+      const labels=[...byMonth.keys()].sort();
+      const req=labels.map(l=>byMonth.get(l).req);
+      const app=labels.map(l=>byMonth.get(l).app);
+      const iss=labels.map(l=>byMonth.get(l).iss);
+
+      if(chart) chart.destroy();
+      chart=new Chart($("#kpiChart"),{
+        type:"bar",
+        data:{labels,datasets:[
+          {label:"Requested",data:req,stack:"x"},
+          {label:"Approved",data:app,stack:"x"},
+          {label:"Issued",data:iss,stack:"x"}
+        ]},
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          scales:{x:{stacked:true,ticks:{color:"#cbd5e1"}},y:{stacked:true,beginAtZero:true,ticks:{color:"#cbd5e1"}}},
+          plugins:{legend:{labels:{color:"#cbd5e1"}}}
+        }
+      });
+    }
+
+    /* -------- Export CSV (filtered) -------- */
+    function exportFilteredCsv(){
+      if(!VIEW.length){ alert("No rows to export."); return; }
+      const headers=[..."Indent No,Indent Date,Department,Indenter,Item Code,Item Name,Request Qty,Approved Qty,Issued Qty,Total Issue (RM),Status".split(",")];
+      const rows=VIEW.map(r=>[
+        r["Indent No"]||"", r["Indent Date"]||"", r.Department_, r.Indenter_, r["Item Code"]||"",
+        r.ItemName_, r.RequestQty_, r.ApprovedQty_, r.IssuedQty_, r.TotalIssueRM_, r.Status_
+      ]);
+      const csv=Papa.unparse([headers,...rows]);
+      const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=url; a.download="indent_vs_supply_filtered.csv"; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    /* -------- Events -------- */
+    $("#searchInput").addEventListener("input", ()=>{applyFilters();});
+    $("#fromDate").addEventListener("change", applyFilters);
+    $("#toDate").addEventListener("change", applyFilters);
+
+    $("#prevPage").onclick=()=>{ if(PAGE>1){ PAGE--; renderTable(); } };
+    $("#nextPage").onclick=()=>{
+      const totalPages=Math.max(1,Math.ceil(VIEW.length/PAGE_SIZE));
+      if(PAGE<totalPages){ PAGE++; renderTable(); }
+    };
+    $("#pageSize").onchange=()=>{ PAGE_SIZE=+$("#pageSize").value; PAGE=1; renderTable(); };
+    $("#exportCsv").onclick=exportFilteredCsv;
+
+    $("#clearAll").onclick=()=>{
+      $("#searchInput").value="";
+      $("#fromDate").value="";
+      $("#toDate").value="";
+      FILTERS={depts:[],statuses:[],meds:[],indenters:[]};
+      loadData();
+    };
+
+    /* -------- Boot -------- */
+    window.onload=loadData;
+  </script>
 </body>
 </html>
