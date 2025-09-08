@@ -8,50 +8,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script type="application/ld+json">
-  {"@context":"https://schema.org","@type":"WebApplication","name":"Indent vs Supply Dashboard","description":"Real-time analytics dashboard for indent vs supply data with advanced filters, KPIs, and charts.","applicationCategory":"BusinessApplication","operatingSystem":"All","creator":{"@type":"Person","name":"adzry"}}
-  </script>
-  <style>
-    body { font-family: 'Inter', sans-serif; background: #0F172A; color: #E2E8F0; }
-    mark { background: #fde04780; color: inherit; padding: 0 .125rem; border-radius: .25rem; }
-    .card { background:#0b1220; border:1px solid #1f2a44; }
-    .glass { background: rgba(15,23,42,.6); backdrop-filter: blur(8px); }
-    .table-sticky thead th { position: sticky; top: 0; background:#0b1220; z-index: 1; }
-    .multi-select { position: relative; }
-    .multi-select input { width: 100%; background: #1f2a44; color: white; padding: .6rem .8rem; border-radius: .6rem; outline: none; }
-    .multi-select .options { position:absolute; top:100%; left:0; right:0; background:#0b1220; border:1px solid #1f2a44; border-radius:.6rem; max-height: 220px; overflow-y:auto; z-index: 50; display:none; }
-    .multi-select .option { padding:.5rem .7rem; cursor:pointer; }
-    .multi-select .option:hover { background:#1f2a44; }
-    .multi-select .chips { display:flex; flex-wrap:wrap; gap:.25rem; margin-top:.25rem; }
-    .multi-select .chip { background:#1f2a44; color:#cbd5e1; padding:.15rem .5rem; border-radius:9999px; display:flex; align-items:center; gap:.35rem; font-size:.75rem; }
-    .multi-select .chip button{ background:transparent;border:none;color:#93c5fd;cursor:pointer }
-  </style>
 </head>
 <body>
-  <nav class="glass sticky top-0 z-50 flex items-center justify-between px-6 py-3 shadow-lg">
-    <div class="text-lg font-semibold text-indigo-400">Indent vs Supply</div>
-    <div class="flex gap-4 text-sm text-slate-300">
-      <a class="hover:text-white">Dashboard</a>
-      <a class="hover:text-white">Reports</a>
-      <a class="hover:text-white">About</a>
-    </div>
-  </nav>
-
-  <!-- Filters -->
   <main class="container mx-auto px-4 py-7 space-y-6">
-    <section class="card rounded-3xl p-6 shadow-lg">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-semibold">Filters</h2>
-        <div class="flex items-center gap-2">
-          <button id="clearAll" class="text-xs px-3 py-1 rounded-full bg-slate-700 hover:bg-slate-600">Clear</button>
-          <button id="exportCsv" class="text-xs px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-500">Export CSV</button>
-        </div>
-      </div>
+    <!-- Filters -->
+    <section class="bg-slate-800 p-6 rounded-3xl shadow-lg mb-6">
+      <h2 class="text-lg font-semibold mb-4">Filters</h2>
       <div class="space-y-4">
-        <div><label class="block text-sm mb-1">Search</label><input id="searchInput" type="search" class="w-full bg-slate-700 rounded-xl px-4 py-2"></div>
+        <div>
+          <label class="block text-sm mb-1">Search</label>
+          <input id="searchInput" type="search" class="w-full bg-slate-700 rounded-xl px-4 py-2" />
+        </div>
         <div class="grid grid-cols-2 gap-4">
-          <div><label class="block text-sm mb-1">From date</label><input id="fromDate" type="date" class="w-full bg-slate-700 rounded-xl px-4 py-2"></div>
-          <div><label class="block text-sm mb-1">To date</label><input id="toDate" type="date" class="w-full bg-slate-700 rounded-xl px-4 py-2"></div>
+          <div><label class="block text-sm mb-1">From date</label><input id="fromDate" type="date" class="w-full bg-slate-700 rounded-xl px-4 py-2" /></div>
+          <div><label class="block text-sm mb-1">To date</label><input id="toDate" type="date" class="w-full bg-slate-700 rounded-xl px-4 py-2" /></div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><label class="block text-sm mb-1">Department</label><div id="deptMultiSelect" class="multi-select"></div></div>
@@ -61,12 +31,19 @@
           <div><label class="block text-sm mb-1">Medication</label><div id="medMultiSelect" class="multi-select"></div></div>
           <div><label class="block text-sm mb-1">Indenter</label><div id="indenterMultiSelect" class="multi-select"></div></div>
         </div>
+        <div class="flex justify-end gap-2">
+          <button id="clearAll" class="text-xs px-3 py-1 rounded-full bg-slate-700 hover:bg-slate-600">Clear</button>
+          <button id="exportCsv" class="text-xs px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-500">Export CSV</button>
+        </div>
       </div>
     </section>
 
     <!-- KPIs -->
-    <section class="card rounded-3xl p-6 shadow-lg">
-      <div class="flex justify-between mb-4"><h2 class="text-lg font-semibold">KPIs</h2><span id="rowCount" class="bg-indigo-900/50 px-3 py-1 rounded-full text-xs">0 rows</span></div>
+    <section class="bg-slate-800 p-6 rounded-3xl shadow-lg">
+      <div class="flex justify-between mb-4">
+        <h2 class="text-lg font-semibold">KPIs</h2>
+        <span id="rowCount" class="bg-indigo-900/50 px-3 py-1 rounded-full text-xs">0 rows</span>
+      </div>
       <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div class="glass rounded-xl p-4"><div class="text-slate-400 text-xs">Total Req</div><div id="kpiRequested" class="text-2xl font-bold">–</div></div>
         <div class="glass rounded-xl p-4"><div class="text-slate-400 text-xs">Total App</div><div id="kpiApproved" class="text-2xl font-bold">–</div></div>
@@ -78,7 +55,7 @@
     </section>
 
     <!-- Table -->
-    <section class="card rounded-3xl p-6 shadow-lg">
+    <section class="bg-slate-800 p-6 rounded-3xl shadow-lg">
       <div class="overflow-auto max-h-[60vh] table-sticky">
         <table class="w-full text-sm" id="dataTable">
           <thead><tr id="tableHead"></tr></thead>
@@ -93,34 +70,153 @@
     </section>
   </main>
 
-  <!-- Full JS -->
+  <!-- 🚀 Upgraded JS -->
   <script>
     const $=(s)=>document.querySelector(s);
-    const SHEET_URL="https://docs.google.com/spreadsheets/d/1uZia-6S9wB8SItfl1M2GvfGgFO4PXxE8li8Sgg6T5Po/edit";const GID="0";
-    let RAW=[],VIEW=[],PAGE=1,PAGE_SIZE=25,FILTERS={depts:[],statuses:[],meds:[],indenters:[]};let chart;
+    const API_BASE="https://script.google.com/macros/s/AKfycbzyRbe0-ZNEhwQ0YMBFfdyIb-CgmvqpWlIqzHvsAP_W85CC7OZCble_ztKSTdl9Z6QQsQ/exec";
+    const SHEET_URL="https://docs.google.com/spreadsheets/d/1uZia-6S9wB8SItfl1M2GvfGgFO4PXxE8li8Sgg6T5Po/edit";
+    const GID="0";
+
+    let RAW=[],VIEW=[],PAGE=1,PAGE_SIZE=25,chart;
+    let FILTERS={depts:[],statuses:[],meds:[],indenters:[]};
 
     const fmtInt=(n)=>Number(n||0).toLocaleString();
     const fmtMoney=(n)=>(n??0).toLocaleString(undefined,{style:"currency",currency:"MYR",maximumFractionDigits:2});
 
-    function createMultiSelect(el,options,onChange){el.innerHTML=`<input type="text" placeholder="Search..." class="search" /><div class="chips"></div><div class="options"></div>`;const input=el.querySelector(".search"),chips=el.querySelector(".chips"),dropdown=el.querySelector(".options");let selected=[];function renderOptions(q=""){dropdown.innerHTML="";options.filter(o=>o&&o.toLowerCase().includes(q.toLowerCase())&&!selected.includes(o)).forEach(opt=>{const d=document.createElement("div");d.className="option";d.textContent=opt;d.onclick=()=>{selected.push(opt);renderChips();onChange(selected);dropdown.style.display="none";input.value="";};dropdown.appendChild(d);});}function renderChips(){chips.innerHTML="";selected.forEach(opt=>{const c=document.createElement("span");c.className="chip";c.innerHTML=`${opt}<button>&times;</button>`;c.querySelector("button").onclick=()=>{selected=selected.filter(s=>s!==opt);renderChips();onChange(selected);};chips.appendChild(c);});}input.addEventListener("focus",()=>{renderOptions();dropdown.style.display="block";});input.addEventListener("input",()=>renderOptions(input.value));document.addEventListener("click",e=>{if(!el.contains(e.target))dropdown.style.display="none";});renderOptions();}
-    
-    function loadData(){google.script.run.withSuccessHandler(csv=>{if(typeof csv==="object"&&csv.error){alert(csv.error);return;}const rows=csv.split("\n").map(r=>r.split(","));const headers=rows[0];RAW=rows.slice(1).map(r=>Object.fromEntries(r.map((v,i)=>[headers[i],v])));RAW=RAW.map(r=>({...r,IndentDate_:new Date(r["Indent Date"]),RequestQty_:+r["Request Qty"]||0,ApprovedQty_:+r["Approved Qty"]||0,IssuedQty_:+r["Issued Qty"]||0,TotalIssueRM_:+r["Total Issue (RM)"]||0,Department_:(r["Department"]||"").trim(),Status_:(r["Status"]||"").trim(),ItemName_:(r["Item Name"]||"").trim(),Indenter_:(r["Indenter"]||"").trim()}));refreshFilters();applyFilters();}).getData(SHEET_URL,GID);}
-    
-    function refreshFilters(){const uniq=a=>[...new Set(a.filter(Boolean))].sort();createMultiSelect($("#deptMultiSelect"),uniq(RAW.map(r=>r.Department_)),v=>{FILTERS.depts=v;applyFilters();});createMultiSelect($("#statusMultiSelect"),uniq(RAW.map(r=>r.Status_)),v=>{FILTERS.statuses=v;applyFilters();});createMultiSelect($("#medMultiSelect"),uniq(RAW.map(r=>r.ItemName_)),v=>{FILTERS.meds=v;applyFilters();});createMultiSelect($("#indenterMultiSelect"),uniq(RAW.map(r=>r.Indenter_)),v=>{FILTERS.indenters=v;applyFilters();});}
+    function buildApiUrl(){
+      const params=new URLSearchParams();
+      params.set("format","json");
+      params.set("sheetUrl",SHEET_URL);
+      params.set("gid",GID);
+      const from=$("#fromDate").value,to=$("#toDate").value;
+      if(from)params.set("from",from);
+      if(to)params.set("to",to);
+      FILTERS.depts.forEach(v=>params.append("dept",v));
+      FILTERS.statuses.forEach(v=>params.append("status",v));
+      FILTERS.meds.forEach(v=>params.append("drug",v));
+      FILTERS.indenters.forEach(v=>params.append("indenter",v));
+      const q=$("#searchInput").value.trim();
+      if(q)params.set("q",q);
+      return `${API_BASE}?${params.toString()}`;
+    }
 
-    function applyFilters(){let v=[...RAW];const q=$("#searchInput").value.trim().toLowerCase();if(q)v=v.filter(r=>`${r.ItemName_} ${r.Department_} ${r.Status_} ${r.Indenter_}`.toLowerCase().includes(q));const from=$("#fromDate").value?new Date($("#fromDate").value):null;const to=$("#toDate").value?new Date($("#toDate").value):null;if(from)v=v.filter(r=>r.IndentDate_&&r.IndentDate_>=from);if(to)v=v.filter(r=>r.IndentDate_&&r.IndentDate_<=to);if(FILTERS.depts.length)v=v.filter(r=>FILTERS.depts.includes(r.Department_));if(FILTERS.statuses.length)v=v.filter(r=>FILTERS.statuses.includes(r.Status_));if(FILTERS.meds.length)v=v.filter(r=>FILTERS.meds.includes(r.ItemName_));if(FILTERS.indenters.length)v=v.filter(r=>FILTERS.indenters.includes(r.Indenter_));VIEW=v;renderTable();updateKPIs();drawChart();}
-    
-    function renderTable(){const head=["Indent No","Indent Date","Department","Indenter","Item Code","Item Name","Request Qty","Approved Qty","Issued Qty","Total Issue (RM)","Status"];$("#tableHead").innerHTML=head.map(h=>`<th>${h}</th>`).join("");$("#tableBody").innerHTML=VIEW.slice((PAGE-1)*PAGE_SIZE,PAGE*PAGE_SIZE).map(r=>`<tr><td>${r["Indent No"]}</td><td>${r["Indent Date"]}</td><td>${r.Department_}</td><td>${r.Indenter_}</td><td>${r["Item Code"]}</td><td>${r.ItemName_}</td><td>${fmtInt(r.RequestQty_)}</td><td>${fmtInt(r.ApprovedQty_)}</td><td>${fmtInt(r.IssuedQty_)}</td><td>${fmtMoney(r.TotalIssueRM_)}</td><td>${r.Status_}</td></tr>`).join("");$("#rowCount").textContent=`${VIEW.length} rows`;}
+    function loadData(){
+      fetch(buildApiUrl())
+        .then(r=>r.json())
+        .then(data=>{
+          RAW=data.map(r=>({...r,
+            IndentDate_:r["Indent Date"]?new Date(r["Indent Date"]):null,
+            RequestQty_:+r["Request Qty"]||0,
+            ApprovedQty_:+r["Approved Qty"]||0,
+            IssuedQty_:+r["Issued Qty"]||0,
+            TotalIssueRM_:+r["Total Issue (RM)"]||0,
+            Department_:(r["Department"]||"").trim(),
+            Status_:(r["Status"]||"").trim(),
+            ItemName_:(r["Item Name"]||"").trim(),
+            Indenter_:(r["Indenter"]||"").trim()
+          }));
+          VIEW=RAW;
+          refreshFilters();
+          renderTable();
+          updateKPIs();
+          drawChart();
+        })
+        .catch(err=>alert("Fetch error: "+err.message));
+    }
 
-    function updateKPIs(){const sum=k=>VIEW.reduce((a,r)=>a+(r[k]||0),0);$("#kpiRequested").textContent=fmtInt(sum("RequestQty_"));$("#kpiApproved").textContent=fmtInt(sum("ApprovedQty_"));$("#kpiIssued").textContent=fmtInt(sum("IssuedQty_"));$("#kpiUniqueItems").textContent=new Set(VIEW.map(r=>r["Item Code"]||r.ItemName_)).size;$("#kpiValue").textContent=fmtMoney(sum("TotalIssueRM_"));}
-    
-    function drawChart(){if(chart)chart.destroy();const byMonth=new Map();VIEW.forEach(r=>{const m=r.IndentDate_?r.IndentDate_.toISOString().slice(0,7):"Unknown";const agg=byMonth.get(m)||{req:0,app:0,iss:0};agg.req+=r.RequestQty_||0;agg.app+=r.ApprovedQty_||0;agg.iss+=r.IssuedQty_||0;byMonth.set(m,agg);});const labels=[...byMonth.keys()].sort();chart=new Chart($("#kpiChart"),{type:"bar",data:{labels,datasets:[{label:"Requested",data:labels.map(l=>byMonth.get(l).req),stack:"x"},{label:"Approved",data:labels.map(l=>byMonth.get(l).app),stack:"x"},{label:"Issued",data:labels.map(l=>byMonth.get(l).iss),stack:"x"}]},options:{responsive:true,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}},plugins:{legend:{labels:{color:"#cbd5e1"}}}}});}
-    
-    $("#searchInput").addEventListener("input",applyFilters);
-    $("#fromDate").addEventListener("change",applyFilters);
-    $("#toDate").addEventListener("change",applyFilters);
-    $("#exportCsv").onclick=()=>{if(!VIEW.length)return;const headers=Object.keys(VIEW[0]);const rows=[headers].concat(VIEW.map(r=>headers.map(h=>r[h]||"")));const csv=Papa.unparse(rows);const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="indent_vs_supply_filtered.csv";a.click();URL.revokeObjectURL(url);};
-    $("#clearAll").onclick=()=>{$("#searchInput").value="";$("#fromDate").value="";$("#toDate").value="";FILTERS={depts:[],statuses:[],meds:[],indenters:[]};loadData();};
+    function createMultiSelect(el,options,onChange){
+      el.innerHTML=`<input type="text" placeholder="Search..." class="search" /><div class="chips"></div><div class="options"></div>`;
+      const input=el.querySelector(".search"),chips=el.querySelector(".chips"),dropdown=el.querySelector(".options");
+      let selected=[];
+      function renderOptions(q=""){dropdown.innerHTML="";options.filter(o=>o&&o.toLowerCase().includes(q.toLowerCase())&&!selected.includes(o)).forEach(opt=>{
+        const d=document.createElement("div");d.className="option";d.textContent=opt;
+        d.onclick=()=>{selected.push(opt);renderChips();onChange(selected);dropdown.style.display="none";input.value="";};
+        dropdown.appendChild(d);});}
+      function renderChips(){chips.innerHTML="";selected.forEach(opt=>{const c=document.createElement("span");c.className="chip";c.innerHTML=`${opt}<button>&times;</button>`;c.querySelector("button").onclick=()=>{selected=selected.filter(s=>s!==opt);renderChips();onChange(selected);};chips.appendChild(c);});}
+      input.addEventListener("focus",()=>{renderOptions();dropdown.style.display="block";});
+      input.addEventListener("input",()=>renderOptions(input.value));
+      document.addEventListener("click",e=>{if(!el.contains(e.target))dropdown.style.display="none";});
+      renderOptions();
+    }
+
+    function refreshFilters(){
+      const uniq=a=>[...new Set(a.filter(Boolean))].sort();
+      createMultiSelect($("#deptMultiSelect"),uniq(RAW.map(r=>r.Department_)),v=>{FILTERS.depts=v;loadData();});
+      createMultiSelect($("#statusMultiSelect"),uniq(RAW.map(r=>r.Status_)),v=>{FILTERS.statuses=v;loadData();});
+      createMultiSelect($("#medMultiSelect"),uniq(RAW.map(r=>r.ItemName_)),v=>{FILTERS.meds=v;loadData();});
+      createMultiSelect($("#indenterMultiSelect"),uniq(RAW.map(r=>r.Indenter_)),v=>{FILTERS.indenters=v;loadData();});
+    }
+
+    function renderTable(){
+      const head=["Indent No","Indent Date","Department","Indenter","Item Code","Item Name","Request Qty","Approved Qty","Issued Qty","Total Issue (RM)","Status"];
+      $("#tableHead").innerHTML=head.map(h=>`<th>${h}</th>`).join("");
+      $("#tableBody").innerHTML=VIEW.slice((PAGE-1)*PAGE_SIZE,PAGE*PAGE_SIZE).map(r=>`<tr>
+        <td>${r["Indent No"]||""}</td>
+        <td>${r["Indent Date"]||""}</td>
+        <td>${r.Department_}</td>
+        <td>${r.Indenter_}</td>
+        <td>${r["Item Code"]||""}</td>
+        <td>${r.ItemName_}</td>
+        <td class="text-right">${fmtInt(r.RequestQty_)}</td>
+        <td class="text-right">${fmtInt(r.ApprovedQty_)}</td>
+        <td class="text-right">${fmtInt(r.IssuedQty_)}</td>
+        <td class="text-right">${fmtMoney(r.TotalIssueRM_)}</td>
+        <td>${r.Status_}</td>
+      </tr>`).join("");
+      $("#rowCount").textContent=`${VIEW.length} rows`;
+      const totalPages=Math.max(1,Math.ceil(VIEW.length/PAGE_SIZE));
+      $("#pageInfo").textContent=`Page ${PAGE} of ${totalPages}`;
+    }
+
+    function updateKPIs(){
+      const sum=k=>VIEW.reduce((a,r)=>a+(r[k]||0),0);
+      $("#kpiRequested").textContent=fmtInt(sum("RequestQty_"));
+      $("#kpiApproved").textContent=fmtInt(sum("ApprovedQty_"));
+      $("#kpiIssued").textContent=fmtInt(sum("IssuedQty_"));
+      $("#kpiUniqueItems").textContent=new Set(VIEW.map(r=>r["Item Code"]||r.ItemName_)).size;
+      $("#kpiValue").textContent=fmtMoney(sum("TotalIssueRM_"));
+    }
+
+    function drawChart(){
+      if(chart)chart.destroy();
+      const byMonth=new Map();
+      VIEW.forEach(r=>{
+        const m=r.IndentDate_?r.IndentDate_.toISOString().slice(0,7):"Unknown";
+        const agg=byMonth.get(m)||{req:0,app:0,iss:0};
+        agg.req+=r.RequestQty_||0;agg.app+=r.ApprovedQty_||0;agg.iss+=r.IssuedQty_||0;
+        byMonth.set(m,agg);
+      });
+      const labels=[...byMonth.keys()].sort();
+      chart=new Chart($("#kpiChart"),{type:"bar",data:{labels,datasets:[
+        {label:"Requested",data:labels.map(l=>byMonth.get(l).req),stack:"x"},
+        {label:"Approved",data:labels.map(l=>byMonth.get(l).app),stack:"x"},
+        {label:"Issued",data:labels.map(l=>byMonth.get(l).iss),stack:"x"}]},
+        options:{responsive:true,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}},plugins:{legend:{labels:{color:"#cbd5e1"}}}}});
+    }
+
+    $("#exportCsv").onclick=()=>{
+      if(!VIEW.length)return;
+      const headers=Object.keys(VIEW[0]);
+      const rows=[headers].concat(VIEW.map(r=>headers.map(h=>r[h]||"")));
+      const csv=Papa.unparse(rows);
+      const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");a.href=url;a.download="indent_vs_supply_filtered.csv";a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    $("#clearAll").onclick=()=>{
+      $("#searchInput").value="";
+      $("#fromDate").value="";
+      $("#toDate").value="";
+      FILTERS={depts:[],statuses:[],meds:[],indenters:[]};
+      loadData();
+    };
+
+    $("#prevPage").onclick=()=>{if(PAGE>1){PAGE--;renderTable();}};
+    $("#nextPage").onclick=()=>{const totalPages=Math.max(1,Math.ceil(VIEW.length/PAGE_SIZE));if(PAGE<totalPages){PAGE++;renderTable();}};
+    $("#pageSize").onchange=()=>{PAGE_SIZE=+$("#pageSize").value;PAGE=1;renderTable();};
+
     window.onload=loadData;
   </script>
 </body>
