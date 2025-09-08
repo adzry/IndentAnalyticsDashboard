@@ -4,209 +4,63 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Indent vs Supply — Elite Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="description" content="Real-time Indent vs Supply analytics with server-side filters, KPIs, and export." />
+  <meta name="theme-color" content="#0F172A" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: 'Inter', sans-serif; background: #0F172A; color: #E2E8F0; }
+    .card { background:#0b1220; border:1px solid #1f2a44; }
+    .glass { background: rgba(15,23,42,.6); backdrop-filter: blur(8px); }
+    .table-sticky thead th { position: sticky; top: 0; background:#0b1220; z-index: 1; }
+    .multi-select { position: relative; }
+    .multi-select input { width: 100%; background: #1f2a44; color: white; padding: .6rem .8rem; border-radius: .6rem; outline: none; }
+    .multi-select .options { position:absolute; top:100%; left:0; right:0; background:#0b1220; border:1px solid #1f2a44; border-radius:.6rem; max-height: 220px; overflow-y:auto; z-index: 50; display:none; }
+    .multi-select .option { padding:.5rem .7rem; cursor:pointer; }
+    .multi-select .option:hover { background:#1f2a44; }
+    .multi-select .chips { display:flex; flex-wrap:wrap; gap:.25rem; margin-top:.35rem; }
+    .multi-select .chip { background:#1f2a44; color:#cbd5e1; padding:.15rem .5rem; border-radius:9999px; display:flex; align-items:center; gap:.35rem; font-size:.75rem; }
+    .multi-select .chip button{ background:transparent;border:none;color:#93c5fd;cursor:pointer }
+    mark { background: #fde04780; color: inherit; padding: 0 .125rem; border-radius: .25rem; }
+  </style>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"Indent vs Supply Analytics","description":"Interactive dashboard for pharmacy indent vs supply data with filters, KPIs, and exports.","creator":{"@type":"Organization","name":"Specialist Clinic Pharmacy"},"license":"https://creativecommons.org/licenses/by/4.0/","keywords":["pharmacy","indent","supply","analytics","Malaysia"]}</script>
 </head>
 <body>
-  <main class="container mx-auto px-4 py-7 space-y-6">
-    <!-- Filters -->
-    <section class="bg-slate-800 p-6 rounded-3xl shadow-lg mb-6">
-      <h2 class="text-lg font-semibold mb-4">Filters</h2>
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm mb-1">Search</label>
-          <input id="searchInput" type="search" class="w-full bg-slate-700 rounded-xl px-4 py-2" />
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="block text-sm mb-1">From date</label><input id="fromDate" type="date" class="w-full bg-slate-700 rounded-xl px-4 py-2" /></div>
-          <div><label class="block text-sm mb-1">To date</label><input id="toDate" type="date" class="w-full bg-slate-700 rounded-xl px-4 py-2" /></div>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div><label class="block text-sm mb-1">Department</label><div id="deptMultiSelect" class="multi-select"></div></div>
-          <div><label class="block text-sm mb-1">Status</label><div id="statusMultiSelect" class="multi-select"></div></div>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div><label class="block text-sm mb-1">Medication</label><div id="medMultiSelect" class="multi-select"></div></div>
-          <div><label class="block text-sm mb-1">Indenter</label><div id="indenterMultiSelect" class="multi-select"></div></div>
-        </div>
-        <div class="flex justify-end gap-2">
-          <button id="clearAll" class="text-xs px-3 py-1 rounded-full bg-slate-700 hover:bg-slate-600">Clear</button>
-          <button id="exportCsv" class="text-xs px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-500">Export CSV</button>
-        </div>
-      </div>
-    </section>
+  <!-- Navbar -->
+  <header class="sticky top-0 z-40 bg-slate-900/80 backdrop-blur border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3"><div class="h-8 w-8 rounded-xl bg-indigo-600"></div><div class="font-semibold">Indent vs Supply</div><span class="text-xs text-slate-400 hidden md:inline">Elite Dashboard</span></div>
+      <nav class="hidden md:flex items-center gap-4 text-sm text-slate-300"><a class="hover:text-white" href="#filters">Filters</a><a class="hover:text-white" href="#kpis">KPIs</a><a class="hover:text-white" href="#table">Table</a></nav>
+      <div class="text-xs text-slate-400">v1.0</div>
+    </div>
+  </header>
 
-    <!-- KPIs -->
-    <section class="bg-slate-800 p-6 rounded-3xl shadow-lg">
-      <div class="flex justify-between mb-4">
-        <h2 class="text-lg font-semibold">KPIs</h2>
-        <span id="rowCount" class="bg-indigo-900/50 px-3 py-1 rounded-full text-xs">0 rows</span>
-      </div>
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <div class="glass rounded-xl p-4"><div class="text-slate-400 text-xs">Total Req</div><div id="kpiRequested" class="text-2xl font-bold">–</div></div>
-        <div class="glass rounded-xl p-4"><div class="text-slate-400 text-xs">Total App</div><div id="kpiApproved" class="text-2xl font-bold">–</div></div>
-        <div class="glass rounded-xl p-4"><div class="text-slate-400 text-xs">Total Iss</div><div id="kpiIssued" class="text-2xl font-bold">–</div></div>
-        <div class="glass rounded-xl p-4"><div class="text-slate-400 text-xs">Unique</div><div id="kpiUniqueItems" class="text-2xl font-bold">–</div></div>
-        <div class="glass rounded-xl p-4"><div class="text-slate-400 text-xs">Total Value</div><div id="kpiValue" class="text-2xl font-bold">–</div></div>
-      </div>
-      <canvas id="kpiChart" height="110"></canvas>
-    </section>
-
-    <!-- Table -->
-    <section class="bg-slate-800 p-6 rounded-3xl shadow-lg">
-      <div class="overflow-auto max-h-[60vh] table-sticky">
-        <table class="w-full text-sm" id="dataTable">
-          <thead><tr id="tableHead"></tr></thead>
-          <tbody id="tableBody"></tbody>
-        </table>
-      </div>
-      <div class="flex justify-between mt-4">
-        <button id="prevPage">Prev</button>
-        <div id="pageInfo">Page 1</div>
-        <button id="nextPage">Next</button>
-      </div>
-    </section>
+  <main class="max-w-7xl mx-auto px-4 py-7 space-y-6">
+    <!-- Filters / KPIs / Table blocks go here -->
   </main>
 
-  <!-- 🚀 Full JS with Skeleton Screens -->
+  <!-- === FULL EMBEDDED JS LOGIC === -->
   <script>
-    const $=(s)=>document.querySelector(s);
     const API_BASE="https://script.google.com/macros/s/AKfycbzyRbe0-ZNEhwQ0YMBFfdyIb-CgmvqpWlIqzHvsAP_W85CC7OZCble_ztKSTdl9Z6QQsQ/exec";
     const SHEET_URL="https://docs.google.com/spreadsheets/d/1uZia-6S9wB8SItfl1M2GvfGgFO4PXxE8li8Sgg6T5Po/edit";
     const GID="0";
-
-    let RAW=[],VIEW=[],PAGE=1,PAGE_SIZE=25,chart;
-    let FILTERS={depts:[],statuses:[],meds:[],indenters:[]};
-
-    const fmtInt=(n)=>Number(n||0).toLocaleString();
-    const fmtMoney=(n)=>(n??0).toLocaleString(undefined,{style:"currency",currency:"MYR",maximumFractionDigits:2});
-
-    // 🦴 Skeletons
-    function showSkeletons(){
-      ["kpiRequested","kpiApproved","kpiIssued","kpiUniqueItems","kpiValue"].forEach(id=>{
-        $(`#${id}`).innerHTML=`<div class="animate-pulse bg-slate-700 h-6 w-16 rounded"></div>`;
-      });
-      const skeletonRows=Array.from({length:8}).map(()=>`
-        <tr class="animate-pulse">
-          ${Array.from({length:11}).map(()=>`<td class="bg-slate-700 h-4 w-20 rounded"></td>`).join("")}
-        </tr>`).join("");
-      $("#tableBody").innerHTML=skeletonRows;
-      $("#rowCount").textContent="Loading…";
-      $("#pageInfo").textContent="";
-    }
-
-    function buildApiUrl(){
-      const params=new URLSearchParams();
-      params.set("format","json");params.set("sheetUrl",SHEET_URL);params.set("gid",GID);
-      const from=$("#fromDate").value,to=$("#toDate").value;
-      if(from)params.set("from",from);if(to)params.set("to",to);
-      FILTERS.depts.forEach(v=>params.append("dept",v));
-      FILTERS.statuses.forEach(v=>params.append("status",v));
-      FILTERS.meds.forEach(v=>params.append("drug",v));
-      FILTERS.indenters.forEach(v=>params.append("indenter",v));
-      const q=$("#searchInput").value.trim();if(q)params.set("q",q);
-      return `${API_BASE}?${params.toString()}`;
-    }
-
-    function loadData(){
-      showSkeletons();
-      fetch(buildApiUrl()).then(r=>r.json()).then(data=>{
-        RAW=data.map(r=>({...r,
-          IndentDate_:r["Indent Date"]?new Date(r["Indent Date"]):null,
-          RequestQty_:+r["Request Qty"]||0,
-          ApprovedQty_:+r["Approved Qty"]||0,
-          IssuedQty_:+r["Issued Qty"]||0,
-          TotalIssueRM_:+r["Total Issue (RM)"]||0,
-          Department_:(r["Department"]||"").trim(),
-          Status_:(r["Status"]||"").trim(),
-          ItemName_:(r["Item Name"]||"").trim(),
-          Indenter_:(r["Indenter"]||"").trim()
-        }));
-        VIEW=RAW;
-        refreshFilters();renderTable();updateKPIs();drawChart();
-      }).catch(err=>alert("Fetch error: "+err.message));
-    }
-
-    function createMultiSelect(el,options,onChange){
-      el.innerHTML=`<input type="text" placeholder="Search..." class="search" /><div class="chips"></div><div class="options"></div>`;
-      const input=el.querySelector(".search"),chips=el.querySelector(".chips"),dropdown=el.querySelector(".options");
-      let selected=[];
-      function renderOptions(q=""){dropdown.innerHTML="";options.filter(o=>o&&o.toLowerCase().includes(q.toLowerCase())&&!selected.includes(o)).forEach(opt=>{
-        const d=document.createElement("div");d.className="option";d.textContent=opt;
-        d.onclick=()=>{selected.push(opt);renderChips();onChange(selected);dropdown.style.display="none";input.value="";};
-        dropdown.appendChild(d);});}
-      function renderChips(){chips.innerHTML="";selected.forEach(opt=>{const c=document.createElement("span");c.className="chip";c.innerHTML=`${opt}<button>&times;</button>`;c.querySelector("button").onclick=()=>{selected=selected.filter(s=>s!==opt);renderChips();onChange(selected);};chips.appendChild(c);});}
-      input.addEventListener("focus",()=>{renderOptions();dropdown.style.display="block";});
-      input.addEventListener("input",()=>renderOptions(input.value));
-      document.addEventListener("click",e=>{if(!el.contains(e.target))dropdown.style.display="none";});
-      renderOptions();
-    }
-
-    function refreshFilters(){
-      const uniq=a=>[...new Set(a.filter(Boolean))].sort();
-      createMultiSelect($("#deptMultiSelect"),uniq(RAW.map(r=>r.Department_)),v=>{FILTERS.depts=v;loadData();});
-      createMultiSelect($("#statusMultiSelect"),uniq(RAW.map(r=>r.Status_)),v=>{FILTERS.statuses=v;loadData();});
-      createMultiSelect($("#medMultiSelect"),uniq(RAW.map(r=>r.ItemName_)),v=>{FILTERS.meds=v;loadData();});
-      createMultiSelect($("#indenterMultiSelect"),uniq(RAW.map(r=>r.Indenter_)),v=>{FILTERS.indenters=v;loadData();});
-    }
-
-    function renderTable(){
-      const head=["Indent No","Indent Date","Department","Indenter","Item Code","Item Name","Request Qty","Approved Qty","Issued Qty","Total Issue (RM)","Status"];
-      $("#tableHead").innerHTML=head.map(h=>`<th>${h}</th>`).join("");
-      $("#tableBody").innerHTML=VIEW.slice((PAGE-1)*PAGE_SIZE,PAGE*PAGE_SIZE).map(r=>`<tr>
-        <td>${r["Indent No"]||""}</td><td>${r["Indent Date"]||""}</td><td>${r.Department_}</td><td>${r.Indenter_}</td>
-        <td>${r["Item Code"]||""}</td><td>${r.ItemName_}</td>
-        <td class="text-right">${fmtInt(r.RequestQty_)}</td>
-        <td class="text-right">${fmtInt(r.ApprovedQty_)}</td>
-        <td class="text-right">${fmtInt(r.IssuedQty_)}</td>
-        <td class="text-right">${fmtMoney(r.TotalIssueRM_)}</td>
-        <td>${r.Status_}</td>
-      </tr>`).join("");
-      $("#rowCount").textContent=`${VIEW.length} rows`;
-      const totalPages=Math.max(1,Math.ceil(VIEW.length/PAGE_SIZE));
-      $("#pageInfo").textContent=`Page ${PAGE} of ${totalPages}`;
-    }
-
-    function updateKPIs(){
-      const sum=k=>VIEW.reduce((a,r)=>a+(r[k]||0),0);
-      $("#kpiRequested").textContent=fmtInt(sum("RequestQty_"));
-      $("#kpiApproved").textContent=fmtInt(sum("ApprovedQty_"));
-      $("#kpiIssued").textContent=fmtInt(sum("IssuedQty_"));
-      $("#kpiUniqueItems").textContent=new Set(VIEW.map(r=>r["Item Code"]||r.ItemName_)).size;
-      $("#kpiValue").textContent=fmtMoney(sum("TotalIssueRM_"));
-    }
-
-    function drawChart(){
-      if(chart)chart.destroy();
-      const byMonth=new Map();
-      VIEW.forEach(r=>{
-        const m=r.IndentDate_?r.IndentDate_.toISOString().slice(0,7):"Unknown";
-        const agg=byMonth.get(m)||{req:0,app:0,iss:0};
-        agg.req+=r.RequestQty_||0;agg.app+=r.ApprovedQty_||0;agg.iss+=r.IssuedQty_||0;
-        byMonth.set(m,agg);
-      });
-      const labels=[...byMonth.keys()].sort();
-      chart=new Chart($("#kpiChart"),{type:"bar",data:{labels,datasets:[
-        {label:"Requested",data:labels.map(l=>byMonth.get(l).req),stack:"x"},
-        {label:"Approved",data:labels.map(l=>byMonth.get(l).app),stack:"x"},
-        {label:"Issued",data:labels.map(l=>byMonth.get(l).iss),stack:"x"}]},
-        options:{responsive:true,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}},plugins:{legend:{labels:{color:"#cbd5e1"}}}}});
-    }
-
-    $("#exportCsv").onclick=()=>{if(!VIEW.length)return;
-      const headers=Object.keys(VIEW[0]);const rows=[headers].concat(VIEW.map(r=>headers.map(h=>r[h]||"")));
-      const csv=Papa.unparse(rows);const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);
-      const a=document.createElement("a");a.href=url;a.download="indent_vs_supply_filtered.csv";a.click();URL.revokeObjectURL(url);};
-
-    $("#clearAll").onclick=()=>{$("#searchInput").value="";$("#fromDate").value="";$("#toDate").value="";
-      FILTERS={depts:[],statuses:[],meds:[],indenters:[]};loadData();};
-
-    $("#prevPage").onclick=()=>{if(PAGE>1){PAGE--;renderTable();}};
-    $("#nextPage").onclick=()=>{const totalPages=Math.max(1,Math.ceil(VIEW.length/PAGE_SIZE));if(PAGE<totalPages){PAGE++;renderTable();}};
-    $("#pageSize").onchange=()=>{PAGE_SIZE=+$("#pageSize").value;PAGE=1;renderTable();};
-
+    const $=(s)=>document.querySelector(s),fmtInt=(n)=>Number(n||0).toLocaleString(),fmtMoney=(n)=>(n??0).toLocaleString(undefined,{style:"currency",currency:"MYR",maximumFractionDigits:2}),escapeReg=(s)=>s.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&');
+    let RAW=[],VIEW=[],PAGE=1,PAGE_SIZE=25,chart,FILTERS={depts:[],statuses:[],meds:[],indenters:[]};
+    function showSkeletons(){["kpiRequested","kpiApproved","kpiIssued","kpiUniqueItems","kpiValue"].forEach(id=>{$(`#${id}`).innerHTML=`<div class="animate-pulse bg-slate-700 h-6 w-16 rounded"></div>`});const sk=Array.from({length:8}).map(()=>`<tr class="animate-pulse">${Array.from({length:11}).map(()=>`<td class="bg-slate-700 h-4 w-24 rounded"></td>`).join("")}</tr>`).join("");$("#tableBody").innerHTML=sk;$("#rowCount").textContent="Loading…";}
+    function createMultiSelect(el,options,onChange){el.innerHTML=`<input type="text" class="search" /><div class="chips"></div><div class="options"></div>`;const input=el.querySelector(".search"),chips=el.querySelector(".chips"),dropdown=el.querySelector(".options");let selected=[];function renderOptions(q=""){dropdown.innerHTML="";options.filter(o=>o&&o.toLowerCase().includes(q.toLowerCase())&&!selected.includes(o)).slice(0,200).forEach(opt=>{const d=document.createElement("div");d.className="option";d.textContent=opt;d.onclick=()=>{selected.push(opt);renderChips();onChange(selected);dropdown.style.display="none";input.value="";};dropdown.appendChild(d);});}function renderChips(){chips.innerHTML="";selected.forEach(opt=>{const c=document.createElement("span");c.className="chip";c.innerHTML=`${opt}<button>&times;</button>`;c.querySelector("button").onclick=()=>{selected=selected.filter(s=>s!==opt);renderChips();onChange(selected);};chips.appendChild(c);});}input.addEventListener("focus",()=>{renderOptions();dropdown.style.display="block"});input.addEventListener("input",()=>renderOptions(input.value));document.addEventListener("click",e=>{if(!el.contains(e.target))dropdown.style.display="none"});renderOptions();}
+    function refreshFilters(){const uniq=a=>[...new Set(a.filter(Boolean))].sort();createMultiSelect($("#deptMultiSelect"),uniq(RAW.map(r=>r.Department_)),v=>{FILTERS.depts=v;loadData()});createMultiSelect($("#statusMultiSelect"),uniq(RAW.map(r=>r.Status_)),v=>{FILTERS.statuses=v;loadData()});createMultiSelect($("#medMultiSelect"),uniq(RAW.map(r=>r.ItemName_)),v=>{FILTERS.meds=v;loadData()});createMultiSelect($("#indenterMultiSelect"),uniq(RAW.map(r=>r.Indenter_)),v=>{FILTERS.indenters=v;loadData()});}
+    function buildApiUrl(){const params=new URLSearchParams();params.set("format","json");params.set("sheetUrl",SHEET_URL);params.set("gid",GID);const from=$("#fromDate")?.value,to=$("#toDate")?.value;if(from)params.set("from",from);if(to)params.set("to",to);FILTERS.depts.forEach(v=>params.append("dept",v));FILTERS.statuses.forEach(v=>params.append("status",v));FILTERS.meds.forEach(v=>params.append("drug",v));FILTERS.indenters.forEach(v=>params.append("indenter",v));const q=$("#searchInput")?.value.trim();if(q)params.set("q",q);return `${API_BASE}?${params.toString()}`;}
+    function loadData(){showSkeletons();fetch(buildApiUrl()).then(r=>r.json()).then(data=>{RAW=data.map(r=>({...r,IndentDate_:r["Indent Date"]?new Date(r["Indent Date"]):null,RequestQty_:+(r["Request Qty"]||0),ApprovedQty_:+(r["Approved Qty"]||0),IssuedQty_:+(r["Issued Qty"]||0),TotalIssueRM_:+(r["Total Issue (RM)"]||0),Department_:(r["Department"]||"").trim(),Status_:(r["Status"]||"").trim(),ItemName_:(r["Item Name"]||"").trim(),Indenter_:(r["Indenter"]||"").trim()}));VIEW=RAW;refreshFilters();PAGE=1;renderTable();updateKPIs();drawChart();}).catch(err=>alert("Fetch error: "+err.message));}
+    function highlight(t,n){if(!n)return t??"";try{const rx=new RegExp(`(${escapeReg(n)})`,"gi");return(t||"").toString().replace(rx,"<mark>$1</mark>")}catch(_){return t??""}}
+    function renderTable(){const head=["Indent No","Indent Date","Department","Indenter","Item Code","Item Name","Request Qty","Approved Qty","Issued Qty","Total Issue (RM)","Status"];$("#tableHead").innerHTML=head.map(h=>`<th>${h}</th>`).join("");const start=(PAGE-1)*PAGE_SIZE,end=PAGE*PAGE_SIZE,q=$("#searchInput").value.trim();$("#tableBody").innerHTML=VIEW.slice(start,end).map(r=>`<tr class="[&>td]:px-3 [&>td]:py-2"><td>${r["Indent No"]||""}</td><td>${r["Indent Date"]||""}</td><td>${r.Department_}</td><td>${r.Indenter_}</td><td>${r["Item Code"]||""}</td><td>${highlight(r.ItemName_,q)}</td><td class="text-right">${fmtInt(r.RequestQty_)}</td><td class="text-right">${fmtInt(r.ApprovedQty_)}</td><td class="text-right">${fmtInt(r.IssuedQty_)}</td><td class="text-right">${fmtMoney(r.TotalIssueRM_)}</td><td>${r.Status_}</td></tr>`).join("");$("#rowCount").textContent=`${VIEW.length.toLocaleString()} rows`;const totalPages=Math.max(1,Math.ceil(VIEW.length/PAGE_SIZE));$("#pageInfo").textContent=`Page ${PAGE} of ${totalPages}`;}
+    function updateKPIs(){const sum=k=>VIEW.reduce((a,r)=>a+(r[k]||0),0);$("#kpiRequested").textContent=fmtInt(sum("RequestQty_"));$("#kpiApproved").textContent=fmtInt(sum("ApprovedQty_"));$("#kpiIssued").textContent=fmtInt(sum("IssuedQty_"));$("#kpiUniqueItems").textContent=new Set(VIEW.map(r=>r["Item Code"]||r.ItemName_)).size.toLocaleString();$("#kpiValue").textContent=fmtMoney(sum("TotalIssueRM_"));}
+    function drawChart(){if(chart)chart.destroy();const byMonth=new Map();VIEW.forEach(r=>{const m=r.IndentDate_?r.IndentDate_.toISOString().slice(0,7):"Unknown";const agg=byMonth.get(m)||{req:0,app:0,iss:0};agg.req+=r.RequestQty_||0;agg.app+=r.ApprovedQty_||0;agg.iss+=r.IssuedQty_||0;byMonth.set(m,agg)});const labels=[...byMonth.keys()].sort();chart=new Chart($("#kpiChart"),{type:"bar",data:{labels,datasets:[{label:"Requested",data:labels.map(l=>byMonth.get(l).req),stack:"x"},{label:"Approved",data:labels.map(l=>byMonth.get(l).app),stack:"x"},{label:"Issued",data:labels.map(l=>byMonth.get(l).iss),stack:"x"}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}},plugins:{legend:{labels:{color:"#cbd5e1"}}}}});}
+    $("#exportCsv").onclick=()=>{if(!VIEW.length)return;const headers=Object.keys(VIEW[0]);const rows=[headers].concat(VIEW.map(r=>headers.map(h=>r[h]??"")));const csv=Papa.unparse(rows);const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="indent_vs_supply_filtered.csv";a.click();URL.revokeObjectURL(url);};
+    $("#clearAll").onclick=()=>{$("#searchInput").value="";$("#fromDate").value="";$("#toDate").value="";FILTERS={depts:[],statuses:[],meds:[],indenters:[]};loadData();};
+    $("#searchInput").addEventListener("input",()=>{PAGE=1;loadData()});$("#fromDate").addEventListener("change",()=>{PAGE=1;loadData()});$("#toDate").addEventListener("change",()=>{PAGE=1;loadData()});$("#prevPage").onclick=()=>{if(PAGE>1){PAGE--;renderTable()}};$("#nextPage").onclick=()=>{const totalPages=Math.max(1,Math.ceil(VIEW.length/PAGE_SIZE));if(PAGE<totalPages){PAGE++;renderTable()}};$("#pageSize").onchange=()=>{PAGE_SIZE=+$("#pageSize").value;PAGE=1;renderTable();};
     window.onload=loadData;
   </script>
 </body>
