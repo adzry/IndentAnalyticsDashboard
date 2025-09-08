@@ -1,108 +1,110 @@
 /**
  * Elite Google Apps Script Backend
- * Serves Index.html, proxies Google Sheet CSV, and applies server-side filters
+ * Provides secure data access + server-side filtering
+ * Scopes: UrlFetchApp, Drive (readonly/file), Web App
  */
 
-/**
- * Entry point for the web app.
- */
 function doGet(e) {
+  // If API mode requested (?format=json), return JSON instead of HTML
   if (e && e.parameter && e.parameter.format === "json") {
-    return handleJsonRequest(e);
+    var sheetUrl = e.parameter.sheetUrl;
+    var gid = e.parameter.gid || "0";
+    var query = {
+      from: e.parameter.from,
+      to: e.parameter.to,
+      dept: e.parameter.dept ? [].concat(e.parameter.dept) : [],
+      status: e.parameter.status ? [].concat(e.parameter.status) : [],
+      drug: e.parameter.drug ? [].concat(e.parameter.drug) : [],
+      indenter: e.parameter.indenter ? [].concat(e.parameter.indenter) : [],
+      q: e.parameter.q
+    };
+    var data = getData(sheetUrl, gid, query);
+    return ContentService.createTextOutput(JSON.stringify(data))
+      .setMimeType(ContentService.MimeType.JSON);
   }
-  return HtmlService.createHtmlOutputFromFile("Index")
-    .setTitle("Indent vs Supply — Elite Dashboard")
-    .addMetaTag("viewport", "width=device-width, initial-scale=1")
+
+  // Otherwise return the web app HTML UI
+  return HtmlService.createHtmlOutputFromFile('Index')
+    .setTitle('Indent vs Supply — Elite Dashboard')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-/**
- * Handle JSON requests with filters applied server-side.
- */
-function handleJsonRequest(e) {
+function getData(sheetUrl, gid, query) {
   try {
-    const sheetUrl = e.parameter.sheetUrl;
-    const gid = e.parameter.gid || "0";
-    const csv = getData(sheetUrl, gid);
-    if (typeof csv === "object" && csv.error) {
-      return ContentService.createTextOutput(JSON.stringify(csv))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // Parse CSV
-    const rows = Utilities.parseCsv(csv);
-    const headers = rows[0];
-    let data = rows.slice(1).map(r => {
-      const rowObj = {};
-      headers.forEach((h, i) => rowObj[h] = r[i]);
-      return rowObj;
-    });
-
-    // === Apply filters from query params ===
-    const from = e.parameter.from ? new Date(e.parameter.from) : null;
-    const to = e.parameter.to ? new Date(e.parameter.to) : null;
-    const statuses = e.parameter.status ? [].concat(e.parameter.status) : [];
-    const depts = e.parameter.dept ? [].concat(e.parameter.dept) : [];
-    const meds = e.parameter.drug ? [].concat(e.parameter.drug) : [];
-    const indenters = e.parameter.indenter ? [].concat(e.parameter.indenter) : [];
-    const q = e.parameter.q ? e.parameter.q.toLowerCase() : "";
-
-    data = data.filter(r => {
-      try {
-        // Normalize
-        const d = r["Indent Date"] ? new Date(r["Indent Date"]) : null;
-        const status = (r["Status"] || "").trim();
-        const dept = (r["Department"] || "").trim();
-        const med = (r["Item Name"] || "").trim();
-        const ind = (r["Indenter"] || "").trim();
-        const textBlob = `${med} ${dept} ${status} ${ind}`.toLowerCase();
-
-        // Date filters
-        if (from && (!d || d < from)) return false;
-        if (to && (!d || d > to)) return false;
-
-        // Multi-select filters
-        if (statuses.length && !statuses.includes(status)) return false;
-        if (depts.length && !depts.includes(dept)) return false;
-        if (meds.length && !meds.includes(med)) return false;
-        if (indenters.length && !indenters.includes(ind)) return false;
-
-        // Search query
-        if (q && !textBlob.includes(q)) return false;
-
-        return true;
-      } catch (err) {
-        return false;
-      }
-    });
-
-    return ContentService.createTextOutput(JSON.stringify(data))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch (err) {
-    return ContentService.createTextOutput(
-      JSON.stringify({ error: err.message })
-    ).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-/**
- * Fetch CSV from Google Sheet.
- */
-function getData(sheetUrl, gid) {
-  try {
-    const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    var match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (!match) throw new Error("Invalid Google Sheet URL");
+    var spreadsheetId = match[1];
+    var g = gid && /^\d+$/.test(gid) ? gid : "0";
+    var csvUrl = "https://docs.google.com/spreadsheets/d/" +
+                  spreadsheetId + "/gviz/tq?tqx=out:csv&gid=" + g;
 
-    const spreadsheetId = match[1];
-    const g = gid && /^\d+$/.test(gid) ? gid : "0";
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&gid=${g}`;
-
-    const response = UrlFetchApp.fetch(csvUrl, { muteHttpExceptions: true });
+    var response = UrlFetchApp.fetch(csvUrl, { muteHttpExceptions: true });
     if (response.getResponseCode() !== 200) {
       throw new Error("Failed to fetch CSV: " + response.getContentText());
     }
-    return response.getContentText();
+
+    var rows = Utilities.parseCsv(response.getContentText());
+    var headers = rows[0];
+    var data = rows.slice(1).map(function(r) {
+      var obj = {};
+      headers.forEach(function(h,i){ obj[h] = r[i]; });
+      return obj;
+    });
+
+    if (query) data = applyFilters_(data, query);
+    return data;
   } catch (err) {
     return { error: err.message };
   }
+}
+
+function applyFilters_(data, query) {
+  return data.filter(function(r) {
+    try {
+      var dept = (r["Department"]||"").trim();
+      var status = (r["Status"]||"").trim();
+      var drug = (r["Item Name"]||"").trim();
+      var indenter = (r["Indenter"]||"").trim();
+      var indentDate = r["Indent Date"] ? new Date(r["Indent Date"]) : null;
+
+      if (query.dept.length && query.dept.indexOf(dept) === -1) return false;
+      if (query.status.length && query.status.indexOf(status) === -1) return false;
+      if (query.drug.length && query.drug.indexOf(drug) === -1) return false;
+      if (query.indenter.length && query.indenter.indexOf(indenter) === -1) return false;
+
+      if (query.from || query.to) {
+        if (!indentDate) return false;
+        if (query.from && indentDate < new Date(query.from)) return false;
+        if (query.to && indentDate > new Date(query.to)) return false;
+      }
+
+      if (query.q) {
+        var q = query.q.toLowerCase();
+        var combined = [dept, status, drug, indenter, r["Indent No"], r["Item Code"]].join(" ").toLowerCase();
+        if (combined.indexOf(q) === -1) return false;
+      }
+
+      return true;
+    } catch (err) { return false; }
+  });
+}
+
+/**
+ * Secure embedding call example
+ */
+function getEmbedding_(text) {
+  var apiKey = PropertiesService.getScriptProperties().getProperty("OPENAI_API_KEY");
+  if (!apiKey) throw new Error("Missing API key");
+  var url = "https://api.openai.com/v1/embeddings";
+  var payload = { model: "text-embedding-3-small", input: text };
+  var options = {
+    method: "post",
+    contentType: "application/json",
+    headers: { "Authorization": "Bearer " + apiKey },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+  var res = UrlFetchApp.fetch(url, options);
+  return JSON.parse(res.getContentText());
 }
